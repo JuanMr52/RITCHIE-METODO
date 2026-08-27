@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Simulación de la Técnica de Ritchie</title>
+<style>
+  /* =========================================================
+     DISEÑO: fondo blanco, paleta pastel, minimalista.
+     ========================================================= */
+  :root{
+    --bg: #ffffff;
+    --bg-soft: #fbfcfe;
+    --ink: #2f3b46;
+    --ink-soft: #7c8a94;
+    --line: #eef1f4;
+
+    --blue: #cfe9f7;
+    --blue-deep: #9bcdea;
+    --terracotta: #f5e0d2;
+    --terracotta-deep: #e3bfa4;
+    --lavender: #e9e3f8;
+    --lavender-deep: #c8b8ea;
+    --yellow: #fdf1cf;
+    --yellow-deep: #f0d68e;
+
+    --accent: #6fb3c8;
+    --accent-deep: #4f95ab;
+    --success: #bfe3c9;
+    --success-deep: #6fae82;
+    --error: #f3cccc;
+    --error-deep: #d98686;
+
+    --radius: 22px;
+    --radius-sm: 14px;
+    --shadow: 0 10px 30px rgba(47,59,70,0.07);
+    --shadow-sm: 0 4px 12px rgba(47,59,70,0.06);
+  }
+
+  *{ box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
+  html,body{ height:100%; }
+  body{
+    margin:0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color:var(--ink);
+    background:
+      radial-gradient(circle at 1px 1px, #eef3f6 1px, transparent 1px) 0 0/26px 26px,
+      var(--bg);
+    min-height:100%;
+    overflow-x:hidden;
+  }
+
+  #app{ max-width:1100px; margin:0 auto; padding:18px 18px 40px; }
+
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 4px 18px;
+  }
+  .brand{
+    display:flex; align-items:center; gap:10px;
+    font-weight:700; letter-spacing:.02em; font-size:14px; color:var(--ink-soft);
+    text-transform:uppercase;
+  }
+  .brand .dot{ width:9px; height:9px; border-radius:50%; background:var(--accent); }
+  .timer-chip{
+    background:var(--bg-soft); border:1px solid var(--line); border-radius:999px;
+    padding:8px 16px; font-variant-numeric:tabular-nums; font-weight:700; font-size:15px;
+    color:var(--accent-deep); box-shadow:var(--shadow-sm);
+  }
+  .timer-chip.hidden-timer{ visibility:hidden; }
+
+  .screen{ display:none; animation: fadeIn .35s ease; }
+  .screen.active{ display:block; }
+  @keyframes fadeIn{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:none;} }
+
+  /* ---------- pantalla inicio ---------- */
+  .start-card{
+    background:var(--bg-soft); border-radius:var(--radius); box-shadow:var(--shadow);
+    padding:40px 28px; text-align:center; max-width:520px; margin:20px auto 0;
+    border:1px solid var(--line);
+  }
+  .eyebrow{
+    font-size:12px; font-weight:700; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--accent-deep); margin-bottom:10px;
+  }
+  h1.title{
+    font-size:26px; line-height:1.25; margin:0 0 10px; letter-spacing:-.01em;
+  }
+  .subtitle{ font-size:15.5px; color:var(--ink-soft); margin:0 0 18px; }
+  .helptext{ font-size:13.5px; color:var(--ink-soft); line-height:1.6; margin:0 0 26px; }
+
+  .field-label{ display:block; text-align:left; font-size:13px; font-weight:600; margin:0 0 8px; color:var(--ink); }
+  input[type=text]{
+    width:100%; padding:14px 16px; font-size:16px; border-radius:var(--radius-sm);
+    border:1.5px solid var(--line); outline:none; background:#fff; color:var(--ink);
+    transition:border-color .15s ease;
+  }
+  input[type=text]:focus{ border-color:var(--accent); }
+
+  button{ font-family:inherit; cursor:pointer; }
+  .btn-primary{
+    margin-top:20px; width:100%; padding:15px 20px; border:none; border-radius:999px;
+    background:var(--accent); color:#fff; font-weight:700; font-size:15.5px; letter-spacing:.02em;
+    box-shadow:var(--shadow-sm); transition:transform .12s ease, background .15s ease, opacity .15s ease;
+  }
+  .btn-primary:hover{ background:var(--accent-deep); }
+  .btn-primary:active{ transform:scale(.98); }
+  .btn-primary:disabled{ opacity:.45; cursor:not-allowed; }
+
+  .btn-ghost{
+    margin-top:12px; width:100%; padding:13px 20px; border-radius:999px;
+    background:transparent; border:1.5px solid var(--line); color:var(--ink-soft); font-weight:600; font-size:14px;
+  }
+  .btn-ghost:hover{ border-color:var(--accent); color:var(--accent-deep); }
+
+  /* ---------- pantalla de juego ---------- */
+  .instructions-bar{
+    text-align:center; font-size:13.5px; color:var(--ink-soft); margin:0 0 22px; line-height:1.5;
+  }
+  .game-layout{
+    display:flex; flex-direction:column; align-items:center; gap:28px;
+  }
+  @media (min-width:820px){
+    .game-layout{ flex-direction:row; align-items:flex-start; justify-content:center; gap:56px; }
+  }
+
+  .tube-wrap{ display:flex; flex-direction:column; align-items:center; }
+  .tube-caption{ font-size:12px; color:var(--ink-soft); margin-top:14px; text-align:center; max-width:260px; }
+
+  .tube{
+    position:relative; width:132px; height:340px;
+    background: linear-gradient(180deg, rgba(255,255,255,.5), rgba(255,255,255,.15));
+    border:2.5px solid #dfe6ea; border-top:none;
+    border-radius: 0 0 66px 66px;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.6), var(--shadow);
+    overflow:hidden;
+    display:flex; flex-direction:column;
+  }
+  .tube::before{ /* borde/boca del tubo */
+    content:""; position:absolute; top:-14px; left:-6px; right:-6px; height:16px;
+    background:#dfe6ea; border-radius:10px;
+  }
+  .tube-slot{
+    flex:1 1 0; position:relative; display:flex; align-items:center; justify-content:center;
+    border-bottom:1px dashed #d8e0e5;
+    background:var(--bg-soft);
+    transition: background .2s ease, box-shadow .2s ease;
+  }
+  .tube-slot:last-child{ border-bottom:none; }
+  .tube-slot.slot-hover{ box-shadow: inset 0 0 0 2px var(--accent); }
+  .tube-slot.slot-selected-target{ box-shadow: inset 0 0 0 2px var(--accent-deep); }
+  .tube-slot .slot-hint{
+    font-size:10.5px; color:#c3cdd3; letter-spacing:.06em; text-transform:uppercase; font-weight:700;
+    pointer-events:none;
+  }
+  .tube-slot .placed-layer{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    text-align:center; padding:4px 8px; font-size:11.5px; font-weight:700; color:#3c4750;
+    cursor:grab; user-select:none; touch-action:none;
+  }
+  .tube-slot .placed-layer.dragging-source{ opacity:.25; }
+  .tube-slot.correct .placed-layer{ box-shadow: inset 0 0 0 2px var(--success-deep); }
+  .tube-slot.incorrect .placed-layer{ box-shadow: inset 0 0 0 2px var(--error-deep); }
+  .placed-layer.snap-in{ animation: snapIn .22s cubic-bezier(.34,1.56,.64,1); }
+  @keyframes snapIn{ from{ transform:scale(.85); opacity:.4; } to{ transform:scale(1); opacity:1; } }
+
+  /* texturas de capas */
+  .tex-liquid-oil{ background-image: repeating-linear-gradient(100deg, rgba(255,255,255,.5) 0 6px, transparent 6px 14px); }
+  .tex-liquid-clear{ background-image: repeating-linear-gradient(100deg, rgba(255,255,255,.35) 0 4px, transparent 4px 16px); }
+  .tex-debris{ background-image: radial-gradient(rgba(60,71,80,.16) 1.6px, transparent 1.6px); background-size:9px 9px; }
+  .tex-sediment{ background-image: radial-gradient(rgba(60,71,80,.22) 1.8px, transparent 1.8px); background-size:6px 6px; }
+
+  .cards-wrap{
+    display:grid; grid-template-columns:repeat(2,1fr); gap:14px; width:100%; max-width:340px;
+  }
+  @media (min-width:820px){ .cards-wrap{ width:230px; } }
+
+  .layer-card{
+    position:relative; border-radius:var(--radius-sm); padding:14px 10px 12px; min-height:96px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;
+    text-align:center; font-size:12.5px; font-weight:700; color:#3c4750;
+    box-shadow:var(--shadow-sm); border:1px solid rgba(0,0,0,.03);
+    cursor:grab; user-select:none; touch-action:none; transition:transform .12s ease, box-shadow .15s ease;
+  }
+  .layer-card:active{ cursor:grabbing; }
+  .layer-card.selected{ box-shadow: 0 0 0 2.5px var(--accent-deep), var(--shadow-sm); }
+  .layer-card .swatch-icon{ font-size:18px; line-height:1; opacity:.75; }
+  .layer-card.used{ visibility:hidden; }
+
+  .drag-ghost{
+    position:fixed; z-index:999; pointer-events:none; width:130px; min-height:90px;
+    border-radius:var(--radius-sm); display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:6px; font-size:12.5px; font-weight:700; color:#3c4750; box-shadow:0 14px 28px rgba(0,0,0,.15);
+    transform:translate(-50%,-50%) scale(1.04); opacity:.96;
+  }
+
+  .check-row{ display:flex; justify-content:center; margin-top:30px; }
+  .btn-check{
+    padding:16px 34px; border:none; border-radius:999px; background:var(--accent); color:#fff;
+    font-weight:700; font-size:15px; letter-spacing:.02em; box-shadow:var(--shadow-sm);
+    transition:transform .12s ease, background .15s ease, opacity .15s ease;
+  }
+  .btn-check:disabled{ background:#e3e8eb; color:#a9b3ba; box-shadow:none; cursor:not-allowed; }
+  .btn-check:not(:disabled):hover{ background:var(--accent-deep); }
+  .btn-check:not(:disabled):active{ transform:scale(.98); }
+
+  /* ---------- pantalla resultado ---------- */
+  .result-card{
+    background:var(--bg-soft); border:1px solid var(--line); border-radius:var(--radius);
+    box-shadow:var(--shadow); padding:34px 26px; max-width:560px; margin:10px auto 0; text-align:center;
+  }
+  .result-card.win{ animation: pop .5s ease; }
+  @keyframes pop{ 0%{transform:scale(.96);} 40%{transform:scale(1.015);} 100%{transform:scale(1);} }
+  .result-title{ font-size:22px; margin:0 0 4px; }
+  .result-title.win{ color:var(--success-deep); }
+  .result-title.lose{ color:#8a8f95; }
+  .result-meta{ display:flex; justify-content:center; gap:22px; margin:16px 0 20px; }
+  .result-meta div{ text-align:center; }
+  .result-meta .num{ font-size:22px; font-weight:800; }
+  .result-meta .lbl{ font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-soft); margin-top:2px; }
+
+  .review-row{
+    display:flex; align-items:center; gap:10px; text-align:left; padding:10px 12px; border-radius:12px;
+    background:#fff; border:1px solid var(--line); margin-bottom:8px; font-size:13px;
+  }
+  .review-row .badge{ width:22px; height:22px; border-radius:50%; flex:none; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; color:#fff; }
+  .review-row .badge.ok{ background:var(--success-deep); }
+  .review-row .badge.bad{ background:var(--error-deep); }
+  .review-row .pos{ font-weight:700; color:var(--ink-soft); font-size:11.5px; width:52px; flex:none; }
+
+  .explain{
+    text-align:left; background:#fff; border:1px solid var(--line); border-radius:14px; padding:16px 16px;
+    font-size:13px; color:var(--ink-soft); line-height:1.6; margin-top:18px;
+  }
+  .explain b{ color:var(--ink); }
+
+  /* ---------- leaderboard ---------- */
+  .leaderboard{
+    margin:34px auto 0; max-width:560px; background:var(--bg-soft); border:1px solid var(--line);
+    border-radius:var(--radius); padding:20px 18px; box-shadow:var(--shadow-sm);
+  }
+  .leaderboard h3{ margin:0 0 12px; font-size:14px; letter-spacing:.02em; }
+  table.lb-table{ width:100%; border-collapse:collapse; font-size:12.5px; }
+  table.lb-table th{
+    text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-soft);
+    padding:6px 6px; border-bottom:1px solid var(--line);
+  }
+  table.lb-table td{ padding:9px 6px; border-bottom:1px solid var(--line); }
+  table.lb-table tr:last-child td{ border-bottom:none; }
+  .lb-rank{ font-weight:800; color:var(--accent-deep); width:26px; }
+  .lb-empty{ font-size:12.5px; color:var(--ink-soft); text-align:center; padding:14px 0; }
+  .lb-score-pill{ display:inline-block; padding:2px 8px; border-radius:999px; font-weight:700; font-size:11px; }
+  .lb-score-pill.full{ background:var(--success); color:#2c5c3c; }
+  .lb-score-pill.partial{ background:var(--yellow); color:#7a5c15; }
+
+  .footnote{ text-align:center; font-size:11px; color:#b7c0c6; margin-top:26px; }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ animation:none !important; transition:none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <div class="topbar">
+    <div class="brand"><span class="dot"></span> Parasitología · Técnica de Ritchie</div>
+    <div class="timer-chip hidden-timer" id="timerChip">TIEMPO: <span id="timerText">00:00.00</span></div>
+  </div>
+
+  <!-- ===================== PANTALLA 1: INICIO ===================== -->
+  <section class="screen active" id="screen-start">
+    <div class="start-card">
+      <div class="eyebrow">Simulación interactiva</div>
+      <h1 class="title">SIMULACIÓN DE LA TÉCNICA DE RITCHIE</h1>
+      <p class="subtitle">¿Puedes reconstruir correctamente las cuatro capas del tubo?</p>
+      <p class="helptext">Ordena las cuatro capas de la preparación según su posición final en el tubo después de la centrifugación. Arrastra cada elemento a su lugar y, cuando termines, presiona <b>COMPROBAR RESULTADO</b>.</p>
+
+      <label class="field-label" for="nameInput">Nombre del participante</label>
+      <input type="text" id="nameInput" placeholder="Escribe tu nombre" maxlength="30" autocomplete="off">
+
+      <button class="btn-primary" id="btnStart" disabled>COMENZAR</button>
+    </div>
+
+    <div class="leaderboard" id="leaderboardStart"></div>
+    <p class="footnote">Escanea, escribe tu nombre y comienza — sin registro ni instalación.</p>
+  </section>
+
+  <!-- ===================== PANTALLA 2: JUEGO ===================== -->
+  <section class="screen" id="screen-game">
+    <p class="instructions-bar">Arrastra cada capa hacia la posición del tubo que le corresponda. Puedes cambiarlas de lugar las veces que quieras antes de comprobar.</p>
+
+    <div class="game-layout">
+      <div class="tube-wrap">
+        <div class="tube" id="tube">
+          <div class="tube-slot" data-slot="0"><span class="slot-hint">1</span></div>
+          <div class="tube-slot" data-slot="1"><span class="slot-hint">2</span></div>
+          <div class="tube-slot" data-slot="2"><span class="slot-hint">3</span></div>
+          <div class="tube-slot" data-slot="3"><span class="slot-hint">4</span></div>
+        </div>
+        <p class="tube-caption">Tubo de ensayo tras la centrifugación</p>
+      </div>
+
+      <div class="cards-wrap" id="cardsWrap"></div>
+    </div>
+
+    <div class="check-row">
+      <button class="btn-check" id="btnCheck" disabled>COMPROBAR RESULTADO</button>
+    </div>
+  </section>
+
+  <!-- ===================== PANTALLA 3: RESULTADO ===================== -->
+  <section class="screen" id="screen-result">
+    <div class="result-card" id="resultCard">
+      <div class="result-title" id="resultTitle">—</div>
+      <div class="result-meta">
+        <div><div class="num" id="resultTime">00:00.00</div><div class="lbl">Tiempo</div></div>
+        <div><div class="num" id="resultScore">0%</div><div class="lbl">Puntuación</div></div>
+      </div>
+
+      <div id="reviewList"></div>
+
+      <div class="explain" id="explainBox"></div>
+
+      <button class="btn-primary" id="btnAgain">JUGAR DE NUEVO</button>
+    </div>
+
+    <div class="leaderboard" id="leaderboardResult"></div>
+  </section>
+
+</div>
+
+<div class="drag-ghost" id="dragGhost" hidden></div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* =========================================================
+     20. CONFIGURACIÓN DEL CONTENIDO CIENTÍFICO
+     Edita aquí nombres, colores, texturas y posiciones
+     sin tocar el resto de la lógica del juego.
+     correctPosition: 1 = capa superior del tubo, 4 = inferior.
+     ========================================================= */
+  const LAYERS = [
+    {
+      id: "eter",
+      name: "Éter (fase lipídica)",
+      icon: "🧴",
+      correctPosition: 1,
+      css: "tex-liquid-oil",
+      colorVar: "--yellow",
+      description: "Disolvente de grasas que queda en la parte más superior tras la centrifugación."
+    },
+    {
+      id: "detritos",
+      name: "Tapón de detritos",
+      icon: "🟤",
+      correctPosition: 2,
+      css: "tex-debris",
+      colorVar: "--terracotta",
+      description: "Residuos fecales gruesos compactados justo debajo del éter, adheridos a la pared del tubo."
+    },
+    {
+      id: "formol",
+      name: "Formol (fase salina)",
+      icon: "💧",
+      correctPosition: 3,
+      css: "tex-liquid-clear",
+      colorVar: "--blue",
+      description: "Sobrenadante acuoso que debe decantarse cuidadosamente antes de observar el sedimento."
+    },
+    {
+      id: "sedimento",
+      name: "Sedimento",
+      icon: "🔬",
+      correctPosition: 4,
+      css: "tex-sediment",
+      colorVar: "--lavender",
+      description: "Capa inferior, la más densa: aquí se concentran huevos, quistes y larvas a observar al microscopio."
+    }
+  ];
+
+  const LB_KEY = "ritchie_leaderboard_v1";
+  const LB_MAX_SHOWN = 10;
+
+  /* =========================================================
+     ESTADO DEL JUEGO
+     ========================================================= */
+  let participantName = "";
+  let startTimestamp = 0;
+  let elapsedMs = 0;
+  let timerRAF = null;
+  let timerRunning = false;
+
+  // slots[i] = layerId | null   (i = 0..3, 0 = posición superior)
+  let slots = [null, null, null, null];
+  // orden lateral de tarjetas aún no colocadas
+  let sideOrder = [];
+
+  let selectedToken = null; // {type:'side'|'slot', layerId, slotIndex}
+
+  const $ = (sel, root) => (root || document).querySelector(sel);
+  const $all = (sel, root) => Array.from((root || document).querySelectorAll(sel));
+
+  const screens = {
+    start: $("#screen-start"),
+    game: $("#screen-game"),
+    result: $("#screen-result")
+  };
+  function showScreen(name){
+    Object.values(screens).forEach(s => s.classList.remove("active"));
+    screens[name].classList.add("active");
+  }
+
+  function layerById(id){ return LAYERS.find(l => l.id === id); }
+
+  function shuffledLayerIds(){
+    const ids = LAYERS.map(l => l.id);
+    for (let i = ids.length - 1; i > 0; i--){
+      const j = Math.floor(Math.random() * (i + 1));
+      [ids[i], ids[j]] = [ids[j], ids[i]];
+    }
+    return ids;
+  }
+
+  /* =========================================================
+     PANTALLA DE INICIO
+     ========================================================= */
+  const nameInput = $("#nameInput");
+  const btnStart = $("#btnStart");
+
+  nameInput.addEventListener("input", () => {
+    btnStart.disabled = nameInput.value.trim().length === 0;
+  });
+  nameInput.addEventListener("keydown", e => {
+    if (e.key === "Enter" && !btnStart.disabled) btnStart.click();
+  });
+
+  btnStart.addEventListener("click", () => {
+    participantName = nameInput.value.trim();
+    if (!participantName) return;
+    setupNewGame();
+    showScreen("game");
+    startTimer();
+  });
+
+  /* =========================================================
+     CRONÓMETRO
+     ========================================================= */
+  const timerChip = $("#timerChip");
+  const timerText = $("#timerText");
+
+  function formatTime(ms){
+    const totalCentis = Math.floor(ms / 10);
+    const minutes = Math.floor(totalCentis / 6000);
+    const seconds = Math.floor((totalCentis % 6000) / 100);
+    const centis = totalCentis % 100;
+    const pad = (n, l) => String(n).padStart(l, "0");
+    return pad(minutes, 2) + ":" + pad(seconds, 2) + "." + pad(centis, 2);
+  }
+
+  function startTimer(){
+    startTimestamp = performance.now();
+    timerRunning = true;
+    timerChip.classList.remove("hidden-timer");
+    tickTimer();
+  }
+  function tickTimer(){
+    if (!timerRunning) return;
+    elapsedMs = performance.now() - startTimestamp;
+    timerText.textContent = formatTime(elapsedMs);
+    timerRAF = requestAnimationFrame(tickTimer);
+  }
+  function stopTimer(){
+    timerRunning = false;
+    if (timerRAF) cancelAnimationFrame(timerRAF);
+  }
+
+  /* =========================================================
+     CONFIGURAR NUEVA PARTIDA
+     ========================================================= */
+  function setupNewGame(){
+    slots = [null, null, null, null];
+    sideOrder = shuffledLayerIds();
+    selectedToken = null;
+    elapsedMs = 0;
+    timerText.textContent = "00:00.00";
+    renderCards();
+    renderSlots();
+    updateCheckButton();
+  }
+
+  /* =========================================================
+     RENDER: tarjetas laterales
+     ========================================================= */
+  const cardsWrap = $("#cardsWrap");
+
+  function renderCards(){
+    cardsWrap.innerHTML = "";
+    sideOrder.forEach(id => {
+      const layer = layerById(id);
+      const card = document.createElement("div");
+      card.className = "layer-card " + layer.css;
+      card.style.background = `linear-gradient(160deg, var(${layer.colorVar}), #ffffff)`;
+      card.dataset.layerId = id;
+      card.tabIndex = 0;
+      card.setAttribute("role", "button");
+      card.setAttribute("aria-label", "Capa: " + layer.name);
+      card.innerHTML = `<span class="swatch-icon">${layer.icon}</span><span>${layer.name}</span>`;
+      attachDragHandlers(card, { type: "side", layerId: id });
+      card.addEventListener("keydown", e => {
+        if (e.key === "Enter" || e.key === " "){ e.preventDefault(); handleTokenActivate({ type:"side", layerId:id }); }
+      });
+      cardsWrap.appendChild(card);
+    });
+  }
+
+  /* =========================================================
+     RENDER: tubo / slots
+     ========================================================= */
+  const tube = $("#tube");
+  const slotEls = $all(".tube-slot", tube);
+
+  function renderSlots(){
+    slotEls.forEach((slotEl, i) => {
+      slotEl.classList.remove("correct", "incorrect", "slot-selected-target");
+      const existing = slotEl.querySelector(".placed-layer");
+      if (existing) existing.remove();
+      const hint = slotEl.querySelector(".slot-hint");
+
+      const layerId = slots[i];
+      if (layerId){
+        if (hint) hint.style.display = "none";
+        const layer = layerById(layerId);
+        const piece = document.createElement("div");
+        piece.className = "placed-layer snap-in " + layer.css;
+        piece.style.background = `linear-gradient(160deg, var(${layer.colorVar}), var(${layer.colorVar}-deep))`;
+        piece.dataset.layerId = layerId;
+        piece.tabIndex = 0;
+        piece.setAttribute("role", "button");
+        piece.setAttribute("aria-label", layer.name + ", colocado. Toca para mover.");
+        piece.textContent = layer.name;
+        attachDragHandlers(piece, { type: "slot", layerId, slotIndex: i });
+        piece.addEventListener("keydown", e => {
+          if (e.key === "Enter" || e.key === " "){ e.preventDefault(); handleTokenActivate({ type:"slot", layerId, slotIndex:i }); }
+        });
+        slotEl.appendChild(piece);
+      } else {
+        if (hint) hint.style.display = "";
+      }
+    });
+  }
+
+  function updateCheckButton(){
+    const filled = slots.every(s => s !== null);
+    $("#btnCheck").disabled = !filled;
+  }
+
+  /* =========================================================
+     COLOCAR / INTERCAMBIAR CAPAS
+     ========================================================= */
+  function placeFromSideToSlot(layerId, slotIndex){
+    const displaced = slots[slotIndex];
+    slots[slotIndex] = layerId;
+    sideOrder = sideOrder.filter(id => id !== layerId);
+    if (displaced) sideOrder.push(displaced);
+  }
+  function moveSlotToSide(slotIndex){
+    const layerId = slots[slotIndex];
+    if (!layerId) return;
+    slots[slotIndex] = null;
+    sideOrder.push(layerId);
+  }
+  function swapSlots(a, b){
+    if (a === b) return;
+    const tmp = slots[a];
+    slots[a] = slots[b];
+    slots[b] = tmp;
+  }
+
+  function refreshBoard(){
+    renderCards();
+    renderSlots();
+    updateCheckButton();
+    clearSelection();
+  }
+
+  function clearSelection(){
+    selectedToken = null;
+    $all(".layer-card, .placed-layer").forEach(el => el.classList.remove("selected"));
+    slotEls.forEach(s => s.classList.remove("slot-selected-target"));
+  }
+
+  /* Tap/click-based placement (accesible con teclado y para toques cortos) */
+  function handleTokenActivate(token){
+    if (!selectedToken){
+      selectedToken = token;
+      $all(".layer-card, .placed-layer").forEach(el => {
+        el.classList.toggle("selected", el.dataset.layerId === token.layerId &&
+          ((token.type === "side" && el.classList.contains("layer-card")) ||
+           (token.type === "slot" && el.classList.contains("placed-layer"))));
+      });
+      return;
+    }
+    // ya había un token seleccionado: si se vuelve a tocar el mismo, deselecciona
+    if (selectedToken.layerId === token.layerId){
+      clearSelection();
+      return;
+    }
+    // el segundo toque decide destino
+    resolveSelection(token);
+  }
+
+  function resolveSelection(secondToken){
+    const first = selectedToken;
+    if (first.type === "side" && secondToken.type === "slot"){
+      placeFromSideToSlot(first.layerId, secondToken.slotIndex);
+    } else if (first.type === "slot" && secondToken.type === "side"){
+      moveSlotToSide(first.slotIndex);
+    } else if (first.type === "slot" && secondToken.type === "slot"){
+      swapSlots(first.slotIndex, secondToken.slotIndex);
+    } else if (first.type === "side" && secondToken.type === "side"){
+      // sin efecto, simplemente cambia selección
+      clearSelection();
+      handleTokenActivate(secondToken);
+      return;
+    }
+    refreshBoard();
+  }
+
+  /* Tocar directamente un slot vacío mientras hay selección activa */
+  slotEls.forEach((slotEl, i) => {
+    slotEl.addEventListener("click", (e) => {
+      if (e.target.closest(".placed-layer")) return; // lo maneja el propio elemento
+      if (selectedToken){
+        if (selectedToken.type === "side"){
+          placeFromSideToSlot(selectedToken.layerId, i);
+        } else if (selectedToken.type === "slot"){
+          swapSlots(selectedToken.slotIndex, i);
+        }
+        refreshBoard();
+      }
+    });
+  });
+
+  /* =========================================================
+     ARRASTRAR Y SOLTAR (Pointer Events — mouse, touch, pen)
+     ========================================================= */
+  const ghost = $("#dragGhost");
+  const DRAG_THRESHOLD = 6;
+
+  function attachDragHandlers(el, token){
+    let startX = 0, startY = 0, dragging = false, pointerId = null;
+
+    el.addEventListener("pointerdown", (e) => {
+      if (e.button !== undefined && e.button !== 0 && e.pointerType === "mouse") return;
+      startX = e.clientX; startY = e.clientY;
+      dragging = false;
+      pointerId = e.pointerId;
+      el.setPointerCapture(pointerId);
+      e.preventDefault();
+
+      const onMove = (ev) => {
+        const dx = ev.clientX - startX, dy = ev.clientY - startY;
+        if (!dragging && Math.hypot(dx, dy) > DRAG_THRESHOLD){
+          dragging = true;
+          beginGhost(el, token, ev);
+          if (token.type === "slot"){
+            el.classList.add("dragging-source");
+          } else {
+            el.classList.add("used"); // ocultar original mientras se arrastra
+          }
+        }
+        if (dragging){
+          moveGhost(ev);
+          updateSlotHoverState(ev);
+        }
+      };
+      const onUp = (ev) => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+        window.removeEventListener("pointercancel", onUp);
+        try{ el.releasePointerCapture(pointerId); }catch(_){}
+        endGhost();
+        el.classList.remove("dragging-source", "used");
+        clearSlotHoverState();
+
+        if (dragging){
+          handleDrop(token, ev);
+        } else {
+          handleTokenActivate(token);
+        }
+        dragging = false;
+      };
+
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+      window.addEventListener("pointercancel", onUp);
+    });
+  }
+
+  function beginGhost(el, token, ev){
+    const layer = layerById(token.layerId);
+    ghost.className = "drag-ghost " + layer.css;
+    ghost.style.background = `linear-gradient(160deg, var(${layer.colorVar}), #ffffff)`;
+    ghost.innerHTML = `<span class="swatch-icon">${layer.icon}</span><span>${layer.name}</span>`;
+    ghost.hidden = false;
+    moveGhost(ev);
+  }
+  function moveGhost(ev){
+    ghost.style.left = ev.clientX + "px";
+    ghost.style.top = ev.clientY + "px";
+  }
+  function endGhost(){
+    ghost.hidden = true;
+  }
+
+  function updateSlotHoverState(ev){
+    clearSlotHoverState();
+    const slotEl = findSlotAt(ev.clientX, ev.clientY);
+    if (slotEl) slotEl.classList.add("slot-hover");
+  }
+  function clearSlotHoverState(){
+    slotEls.forEach(s => s.classList.remove("slot-hover"));
+  }
+
+  /* Detección de destino por coordenadas (no depende de elementFromPoint,
+     que obligaba a mostrar/ocultar el clon flotante y podía dejarlo
+     "pegado" en pantalla tras soltar). */
+  function findSlotAt(x, y){
+    for (const slotEl of slotEls){
+      const r = slotEl.getBoundingClientRect();
+      if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return slotEl;
+    }
+    return null;
+  }
+  function isOverCardsArea(x, y){
+    const r = cardsWrap.getBoundingClientRect();
+    return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+  }
+
+  function handleDrop(token, ev){
+    const slotEl = findSlotAt(ev.clientX, ev.clientY);
+
+    if (slotEl){
+      const slotIndex = Number(slotEl.dataset.slot);
+      if (token.type === "side"){
+        placeFromSideToSlot(token.layerId, slotIndex);
+      } else if (token.type === "slot"){
+        swapSlots(token.slotIndex, slotIndex);
+      }
+      refreshBoard();
+    } else if (isOverCardsArea(ev.clientX, ev.clientY) && token.type === "slot"){
+      moveSlotToSide(token.slotIndex);
+      refreshBoard();
+    } else {
+      // soltado fuera de cualquier zona válida: no hay cambios
+      refreshBoard();
+    }
+  }
+
+  /* =========================================================
+     COMPROBAR RESULTADO
+     ========================================================= */
+  $("#btnCheck").addEventListener("click", () => {
+    if (!slots.every(s => s !== null)) return;
+    stopTimer();
+    const finalTimeMs = elapsedMs;
+
+    let correctCount = 0;
+    const perSlot = slots.map((layerId, i) => {
+      const layer = layerById(layerId);
+      const isCorrect = layer.correctPosition === i + 1;
+      if (isCorrect) correctCount++;
+      return { slotIndex: i, layer, isCorrect };
+    });
+
+    const score = Math.round((correctCount / 4) * 100);
+    renderResult(finalTimeMs, score, perSlot);
+    saveResult(participantName, finalTimeMs, score);
+    showScreen("result");
+  });
+
+  function renderResult(timeMs, score, perSlot){
+    const card = $("#resultCard");
+    const title = $("#resultTitle");
+    const isPerfect = score === 100;
+
+    card.classList.toggle("win", isPerfect);
+    title.textContent = isPerfect ? "¡ORDEN CORRECTO!" : "ORDEN INCORRECTO";
+    title.className = "result-title " + (isPerfect ? "win" : "lose");
+
+    $("#resultTime").textContent = formatTime(timeMs);
+    $("#resultScore").textContent = score + "%";
+
+    // marcar slots visualmente ahora que ya se comprobó
+    slotEls.forEach((slotEl, i) => {
+      slotEl.classList.remove("correct", "incorrect");
+      slotEl.classList.add(perSlot[i].isCorrect ? "correct" : "incorrect");
+    });
+
+    const reviewList = $("#reviewList");
+    reviewList.innerHTML = "";
+    perSlot.forEach(item => {
+      const row = document.createElement("div");
+      row.className = "review-row";
+      row.innerHTML = `
+        <span class="pos">Posición ${item.slotIndex + 1}</span>
+        <span class="badge ${item.isCorrect ? "ok" : "bad"}">${item.isCorrect ? "✓" : "✕"}</span>
+        <span>${item.layer.name}</span>`;
+      reviewList.appendChild(row);
+    });
+
+    const orderedCorrect = [...LAYERS].sort((a, b) => a.correctPosition - b.correctPosition);
+    const explainBox = $("#explainBox");
+    explainBox.innerHTML = "<b>Orden correcto (de arriba hacia abajo):</b><br>" +
+      orderedCorrect.map((l, idx) => `${idx + 1}. <b>${l.name}</b> — ${l.description}`).join("<br>");
+  }
+
+  $("#btnAgain").addEventListener("click", () => {
+    nameInput.value = participantName;
+    btnStart.disabled = false;
+    setupNewGame();
+    showScreen("start");
+    timerChip.classList.add("hidden-timer");
+    renderLeaderboards();
+  });
+
+  /* =========================================================
+     TABLA DE CLASIFICACIÓN (persistencia local del dispositivo)
+     ---------------------------------------------------------
+     Esta versión usa localStorage, por lo que cada teléfono
+     guarda su propio historial. Para compartir una única tabla
+     entre todos los estudiantes que escanean el mismo QR,
+     sustituye saveResult()/loadResults() por llamadas a un
+     backend (por ejemplo Supabase o Firebase): misma firma de
+     función, distinta implementación interna.
+     ========================================================= */
+  function loadResults(){
+    try{
+      const raw = localStorage.getItem(LB_KEY);
+      return raw ? JSON.parse(raw) : [];
+    }catch(_){ return []; }
+  }
+  function saveResult(name, timeMs, score){
+    const results = loadResults();
+    results.push({ name, timeMs, score, ts: Date.now() });
+    results.sort((a, b) => (b.score - a.score) || (a.timeMs - b.timeMs));
+    localStorage.setItem(LB_KEY, JSON.stringify(results.slice(0, 200)));
+    renderLeaderboards();
+  }
+
+  function buildLeaderboardTable(){
+    const results = loadResults()
+      .slice()
+      .sort((a, b) => (b.score - a.score) || (a.timeMs - b.timeMs))
+      .slice(0, LB_MAX_SHOWN);
+
+    const wrap = document.createElement("div");
+    const heading = document.createElement("h3");
+    heading.textContent = "🏆 MEJORES TIEMPOS";
+    wrap.appendChild(heading);
+
+    if (results.length === 0){
+      const empty = document.createElement("div");
+      empty.className = "lb-empty";
+      empty.textContent = "Todavía no hay resultados registrados. ¡Sé el primero!";
+      wrap.appendChild(empty);
+      return wrap;
+    }
+
+    const table = document.createElement("table");
+    table.className = "lb-table";
+    table.innerHTML = `
+      <thead><tr>
+        <th>#</th><th>Participante</th><th>Tiempo</th><th>Puntuación</th>
+      </tr></thead>`;
+    const tbody = document.createElement("tbody");
+    results.forEach((r, i) => {
+      const tr = document.createElement("tr");
+      const pillClass = r.score === 100 ? "full" : "partial";
+      tr.innerHTML = `
+        <td class="lb-rank">${i + 1}</td>
+        <td>${escapeHtml(r.name)}</td>
+        <td>${formatTime(r.timeMs)}</td>
+        <td><span class="lb-score-pill ${pillClass}">${r.score}%</span></td>`;
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+    return wrap;
+  }
+
+  function renderLeaderboards(){
+    ["leaderboardStart", "leaderboardResult"].forEach(id => {
+      const el = $("#" + id);
+      el.innerHTML = "";
+      el.appendChild(buildLeaderboardTable());
+    });
+  }
+
+  function escapeHtml(str){
+    const d = document.createElement("div");
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  /* =========================================================
+     INICIALIZACIÓN
+     ========================================================= */
+  renderLeaderboards();
+
+})();
+</script>
+</body>
+</html>
